@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Alert, type Recommendation } from '../api';
 import { day, todayIso } from '../format';
 import {
-  Activity, Bell, CalendarDays, CloudOff, Copy, CreditCard, Lightbulb, type LucideIcon, PieChart, Receipt, Repeat, RotateCcw,
+  Activity, Bell, CalendarDays, CloudOff, Inbox, PiggyBank, Copy, CreditCard, Lightbulb, type LucideIcon, PieChart, Receipt, Repeat, RotateCcw,
   Sparkles, TrendingUp, TriangleAlert, X,
 } from 'lucide-react';
 import { Empty, ErrorBox, Loading, Money, PageHeader, SectionTitle, SeverityDot } from '../components/ui';
@@ -16,12 +16,14 @@ const ALERT_TYPES: Record<string, string> = {
   budget: 'תקציב', duplicate: 'חיוב כפול', anomaly: 'חריגה', new_subscription: 'מנוי חדש', price_increase: 'עליית מחיר',
   low_balance: 'יתרה נמוכה', card_vs_balance: 'חיוב כרטיס', fee: 'עמלה', unmatched_card_bill: 'כרטיס לא נסרק',
   scrape_failed: 'סריקה', big_day: 'יום חריג',
+  dormant_funds: 'כסף לא פעיל', active_funds: 'חיסכון פעיל', inbox_imported: 'תיבת קבצים', inbox_failed: 'תיבת קבצים',
 };
 
 const ALERT_ICONS: Record<string, LucideIcon> = {
   budget: PieChart, duplicate: Copy, anomaly: Activity, new_subscription: Repeat, price_increase: TrendingUp,
   low_balance: TriangleAlert, card_vs_balance: CreditCard, fee: Receipt, unmatched_card_bill: CreditCard,
   scrape_failed: CloudOff, big_day: CalendarDays,
+  dormant_funds: PiggyBank, active_funds: PiggyBank, inbox_imported: Inbox, inbox_failed: Inbox,
 };
 const SEVERITY_TILE: Record<string, string> = { critical: 'var(--negative)', warning: 'var(--chart-3)' };
 

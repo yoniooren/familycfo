@@ -19,12 +19,14 @@
     "import:pension": "tsx src/import/pensionReport.ts",
     "import:insurance": "tsx src/import/insurancePolicies.ts",
     "pipeline": "tsx src/pipeline.ts",
+    "inbox": "tsx src/inbox/index.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "demo": "tsx src/demo.ts",
     "dev:demo": "cross-env BANK_DB=demo.db npm run dev"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "fastify": "^5.12.5",
     "israeli-bank-scrapers": "^6.12.2",
     "node-cron": "^3.0.3",
@@ -34,11 +36,11 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/node-cron": "^3.0.11",
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
-    "vitest": "^4.0.2",
-    "concurrently": "^9.2.1",
-    "cross-env": "^7.0.3"
+    "vitest": "^4.0.2"
   },
   "overrides": {
     "israeli-bank-scrapers": {

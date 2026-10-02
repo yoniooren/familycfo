@@ -11,6 +11,7 @@ import { pensionRoutes } from './routes/pension.js';
 import { investmentRoutes } from './routes/investments.js';
 import { setRate } from '../analytics/fx.js';
 import { registerLocalOnly } from './localOnly.js';
+import { INBOX_DIR, watchInbox } from '../inbox/index.js';
 
 const db = getDb();
 // Local-only: this API exposes the household's full financial data and has no login
@@ -90,3 +91,6 @@ app.setErrorHandler((err: Error & { statusCode?: number }, _req, reply) => {
 
 await app.listen({ host: HOST, port: PORT });
 console.log(`Household API on http://${HOST}:${PORT}`);
+// files dropped into data/inbox/ (Har HaBituach / Har HaKesef exports) are imported while the server runs
+watchInbox(db);
+console.log(`Inbox: drop exported files into ${INBOX_DIR}`);

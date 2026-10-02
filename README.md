@@ -174,6 +174,20 @@ Each question starts `claude -p` in a temporary folder with:
 
 The chat never changes data; it tells you where in the app to do it. It gives facts, not investment advice.
 
+## The inbox: drop an export, it lands in the right place
+
+Put a file into `data/inbox/` and, while `npm run dev` is running, it's recognized by its header row and imported
+(or run `npm run inbox` once). Everything is read on your computer — nothing is sent anywhere.
+
+| File | Where it goes |
+|---|---|
+| **הר הביטוח** export (`.xlsx` / `.csv`) | Policies on **ביטוחים**: type (from the branch), insurer, policy number, period, premium and its frequency. A newer export updates premiums and dates and keeps what you changed (name, owner, the text that matches its charges). Only the last 4 digits of the ID number are kept. |
+| **הר הכסף** export (`.xlsx` / `.csv`) | Alerts on **תובנות והתראות**: each inactive product (money nobody deposits into) with the institution's contact details, and one summary of the active ones. Insurance without savings is skipped. |
+
+A handled file moves to `data/inbox/processed/`; one that isn't recognized moves to `data/inbox/failed/` next to a
+`.txt` saying why, and an alert says what happened. A file that's open in Excel waits until it's closed. Hebrew CSVs
+in windows-1255 are read too. `INBOX_DIR` changes the folder.
+
 ## Importing pension and insurance reports
 
 Pension / study / provident fund reports and insurance summaries (e.g. from your agent, the pension clearing house
@@ -203,6 +217,7 @@ Both are idempotent — re-running updates, never duplicates. Policy documents c
 | `futureMonths` | `accounts.json`, per account | 1 for Isracard / Amex, 2 otherwise | Months ahead to fetch (upcoming card charges, installments). Isracard and Amex rate-limit long runs (HTTP 429); a rate-limited company is retried once after `SCRAPE_RETRY_DELAY_MS` (120000). |
 | `SCHEDULE` | env | none | Cron expression; keeps `npm run scrape` running on a schedule. |
 | `POLICIES_DIR` / `REPORTS_DIR` | env | `data/policies` / `data/reports` | Where insurance documents and imported reports are kept. |
+| `INBOX_DIR` | env | `data/inbox` | The folder watched for Har HaBituach / Har HaKesef exports. |
 | `CATEGORY_API_URL` | env | none | `categoryApiUrl` for `npm run pipeline`. |
 | `ALLOWED_HOSTS` | env | none | Extra host names the API accepts (comma-separated). Requests with any other `Host`, or an `Origin` that isn't the web app, are refused (DNS rebinding / CSRF protection). |
 | `CLAUDE_BIN` | env | `claude` on the PATH | Path of the Claude Code CLI for the data chat (`claude`, `claude.exe` or its `cli.js`). |
