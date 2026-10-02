@@ -18,6 +18,8 @@ function findChromePath(): string | undefined {
       '/usr/bin/chromium',
     ],
     win32: [
+      // a per-user Chrome install (the default when installed without admin rights)
+      ...(process.env.LOCALAPPDATA ? [`${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`] : []),
       'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     ],

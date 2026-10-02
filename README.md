@@ -80,7 +80,7 @@ It understands how Israeli money actually moves:
 
 ## Quick start — try the demo
 
-Requirements: **Node.js 20+** and npm. macOS or Linux (Windows works via WSL).
+Requirements: **Node.js 20+** and npm (on Windows, Node 22 LTS is the safest choice), plus Git. macOS, Linux or Windows.
 
 ```bash
 git clone https://github.com/nmazuz/familycfo.git && cd familycfo
@@ -203,6 +203,8 @@ Both are idempotent — re-running updates, never duplicates. Policy documents c
 | `SCHEDULE` | env | none | Cron expression; keeps `npm run scrape` running on a schedule. |
 | `POLICIES_DIR` / `REPORTS_DIR` | env | `data/policies` / `data/reports` | Where insurance documents and imported reports are kept. |
 | `CATEGORY_API_URL` | env | none | `categoryApiUrl` for `npm run pipeline`. |
+| `ALLOWED_HOSTS` | env | none | Extra host names the API accepts (comma-separated). Requests with any other `Host`, or an `Origin` that isn't the web app, are refused (DNS rebinding / CSRF protection). |
+| `CLAUDE_BIN` | env | `claude` on the PATH | Path of the Claude Code CLI for the data chat (`claude`, `claude.exe` or its `cli.js`). |
 | Cycle start day, minimum balance | Settings page | 1, ₪2,000 | |
 
 ## Project structure

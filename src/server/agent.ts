@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import type { DB } from '../db/connection.js';
 import { cycleStartDay, today } from '../analytics/common.js';
 import { POLICIES_DIR, REPORTS_DIR } from './routes/insurance.js';
+import { claudeCommand, shellPath } from './claudeBin.js';
 
 /**
  * The data chat: each message runs the user's own Claude Code (`claude -p`, their subscription) with
@@ -57,7 +58,7 @@ function syncAgentFiles(): void {
     else mkdirSync(join(docs, name));
   }
 
-  const guard = `${JSON.stringify(process.execPath)} ${JSON.stringify(join(ROOT, 'src', 'agent', 'guard-read.mjs'))} ${JSON.stringify(docs)}`;
+  const guard = `${shellPath(process.execPath)} ${shellPath(join(ROOT, 'src', 'agent', 'guard-read.mjs'))} ${shellPath(docs)}`;
   writeFileSync(join(WORKDIR, '.claude', 'settings.json'), JSON.stringify({
     hooks: { PreToolUse: [{ matcher: 'Read', hooks: [{ type: 'command', command: guard }] }] },
   }, null, 2));
@@ -84,8 +85,9 @@ export function agentRoutes(app: FastifyInstance, db: DB): void {
     const mcpConfig = {
       mcpServers: {
         household: {
-          command: join(ROOT, 'node_modules', '.bin', 'tsx'),
-          args: [join(ROOT, 'src', 'agent', 'mcp.ts')],
+          // node + tsx's own entry, not node_modules/.bin/tsx (a .cmd shim on Windows that can't be spawned directly)
+          command: process.execPath,
+          args: [join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs'), join(ROOT, 'src', 'agent', 'mcp.ts')],
           env: {
             BANK_DB: resolve(process.env.BANK_DB ?? 'bank.db'),
             HOUSEHOLD_API: `http://127.0.0.1:${process.env.PORT ?? 4310}`,
@@ -105,7 +107,8 @@ export function agentRoutes(app: FastifyInstance, db: DB): void {
       '--system-prompt', systemPrompt(db),
       ...(sessionId ? ['--resume', sessionId] : []),
     ];
-    const child = spawn('claude', args, { cwd: WORKDIR, env: claudeEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
+    const claude = claudeCommand();
+    const child = spawn(claude.command, [...claude.prefixArgs, ...args], { cwd: WORKDIR, env: claudeEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
     child.stdin.end(message);
 
     reply.hijack();

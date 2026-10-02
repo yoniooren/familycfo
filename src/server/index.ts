@@ -10,6 +10,7 @@ import { insuranceRoutes } from './routes/insurance.js';
 import { pensionRoutes } from './routes/pension.js';
 import { investmentRoutes } from './routes/investments.js';
 import { setRate } from '../analytics/fx.js';
+import { registerLocalOnly } from './localOnly.js';
 
 const db = getDb();
 // Local-only: this API exposes the household's full financial data and has no login
@@ -17,6 +18,8 @@ const HOST = '127.0.0.1';
 const PORT = Number(process.env.PORT ?? 4310);
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'warn' } });
+// refuse requests from other sites in this machine's browser (DNS rebinding, CSRF)
+registerLocalOnly(app, PORT, process.env.WEB_PORT ?? 5180);
 
 registerCrud(app, db, { table: 'members', path: 'members', columns: ['name', 'color'], allowDelete: false });
 registerCrud(app, db, {
