@@ -71,6 +71,31 @@ export async function importFile(db: DB, path: string): Promise<{ kind: string; 
   throw new Error('הקובץ לא זוהה — לא נמצאה בו שורת כותרות של הר הביטוח או של הר הכסף');
 }
 
+/**
+ * Import one file and file it away: processed/ when it was imported, failed/ (+ a .txt with the reason) when not.
+ * `name` is the file name shown to the user and kept in the moved file's name.
+ */
+export async function handleFile(db: DB, dir: string, path: string, name: string): Promise<InboxResult> {
+  // open in Excel (Windows locks it): leave it for the next round instead of importing it twice
+  if (locked(path)) return { file: name, ok: false, summary: 'הקובץ פתוח בתוכנה אחרת — ייובא אחרי שייסגר', locked: true };
+  try {
+    const r = await importFile(db, path);
+    mkdirSync(join(dir, 'processed'), { recursive: true });
+    renameSync(path, join(dir, 'processed', stamp(name)));
+    note(db, true, name, `${r.kind}: ${r.summary}`);
+    return { file: name, ok: true, kind: r.kind, summary: r.summary };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    const failed = join(dir, 'failed');
+    mkdirSync(failed, { recursive: true });
+    const moved = stamp(name);
+    renameSync(path, join(failed, moved));
+    writeFileSync(join(failed, `${moved}.txt`), `${reason}\n`, 'utf-8');
+    note(db, false, name, reason);
+    return { file: name, ok: false, summary: reason };
+  }
+}
+
 /** Process every file waiting in the inbox. */
 export async function processInbox(db: DB, dir = INBOX_DIR): Promise<InboxResult[]> {
   mkdirSync(dir, { recursive: true });
@@ -78,24 +103,7 @@ export async function processInbox(db: DB, dir = INBOX_DIR): Promise<InboxResult
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
     if (ignored(name) || !statSync(path).isFile() || extname(name).toLowerCase() === '.txt') continue;
-    // open in Excel (Windows locks it): leave it for the next round instead of importing it twice
-    if (locked(path)) { results.push({ file: name, ok: false, summary: 'הקובץ פתוח בתוכנה אחרת — ייובא אחרי שייסגר', locked: true }); continue; }
-    try {
-      const r = await importFile(db, path);
-      mkdirSync(join(dir, 'processed'), { recursive: true });
-      renameSync(path, join(dir, 'processed', stamp(name)));
-      note(db, true, name, `${r.kind}: ${r.summary}`);
-      results.push({ file: name, ok: true, kind: r.kind, summary: r.summary });
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      const failed = join(dir, 'failed');
-      mkdirSync(failed, { recursive: true });
-      const moved = stamp(name);
-      renameSync(path, join(failed, moved));
-      writeFileSync(join(failed, `${moved}.txt`), `${reason}\n`, 'utf-8');
-      note(db, false, name, reason);
-      results.push({ file: name, ok: false, summary: reason });
-    }
+    results.push(await handleFile(db, dir, path, name));
   }
   return results;
 }

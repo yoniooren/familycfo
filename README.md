@@ -176,8 +176,8 @@ The chat never changes data; it tells you where in the app to do it. It gives fa
 
 ## The inbox: drop an export, it lands in the right place
 
-Put a file into `data/inbox/` and, while `npm run dev` is running, it's recognized by its header row and imported
-(or run `npm run inbox` once). Everything is read on your computer — nothing is sent anywhere.
+Put a file into `data/inbox/` (or use the **add a file** button in the header, which also works from a phone) and,
+while `npm run dev` is running, it's recognized by its header row and imported (or run `npm run inbox` once). Everything is read on your computer — nothing is sent anywhere.
 
 | File | Where it goes |
 |---|---|

@@ -9,6 +9,7 @@ import { agentRoutes } from './agent.js';
 import { insuranceRoutes } from './routes/insurance.js';
 import { pensionRoutes } from './routes/pension.js';
 import { investmentRoutes } from './routes/investments.js';
+import { inboxRoutes } from './routes/inbox.js';
 import { setRate } from '../analytics/fx.js';
 import { registerLocalOnly } from './localOnly.js';
 import { INBOX_DIR, watchInbox } from '../inbox/index.js';
@@ -83,6 +84,7 @@ agentRoutes(app, db);
 insuranceRoutes(app, db);
 pensionRoutes(app, db);
 investmentRoutes(app, db);
+inboxRoutes(app, db);
 
 app.setErrorHandler((err: Error & { statusCode?: number }, _req, reply) => {
   app.log.error(err);

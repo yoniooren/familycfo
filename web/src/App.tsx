@@ -26,6 +26,7 @@ import Pension from './pages/Pension';
 import Investments from './pages/Investments';
 import { Picker, Segmented } from './components/ui';
 import { AgentChat } from './components/AgentChat';
+import { InboxUpload } from './components/InboxUpload';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/kit/tooltip';
 import { MemberAvatar } from '@/lib/visuals';
 import { cn } from '@/lib/utils';
@@ -238,6 +239,7 @@ export default function App() {
             <div className="hidden min-w-0 flex-1 md:block"><FilterBar /></div>
             <div className="ms-auto flex shrink-0 items-center gap-1">
               <AgentChat />
+              <InboxUpload />
               <AlertsBell unseen={unseen} />
             </div>
           </div>
