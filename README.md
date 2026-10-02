@@ -200,6 +200,7 @@ Both are idempotent — re-running updates, never duplicates. Policy documents c
 | `SCRAPE_ONLY` | env | all | `SCRAPE_ONLY=isracard,max` scrapes only these companies. |
 | `SCRAPE_FROM` | env | 3 months back | Start date of the scrape (`YYYY-MM-DD`), for backfilling. |
 | `SHOW_BROWSER` | env | shown | `SHOW_BROWSER=0` runs Chrome headless. |
+| `futureMonths` | `accounts.json`, per account | 1 for Isracard / Amex, 2 otherwise | Months ahead to fetch (upcoming card charges, installments). Isracard and Amex rate-limit long runs (HTTP 429); a rate-limited company is retried once after `SCRAPE_RETRY_DELAY_MS` (120000). |
 | `SCHEDULE` | env | none | Cron expression; keeps `npm run scrape` running on a schedule. |
 | `POLICIES_DIR` / `REPORTS_DIR` | env | `data/policies` / `data/reports` | Where insurance documents and imported reports are kept. |
 | `CATEGORY_API_URL` | env | none | `categoryApiUrl` for `npm run pipeline`. |

@@ -37,7 +37,16 @@ function findChromePath(): string | undefined {
 interface AccountConfig {
   companyId: keyof typeof CompanyTypes;
   credentials: Record<string, string>;
+  /** months ahead to fetch (upcoming charges / installments); defaults: 1 for Isracard / Amex, 2 otherwise */
+  futureMonths?: number;
 }
+
+// Isracard and Amex answer HTTP 429 ("Automation detected") when one login asks for many months in a row,
+// so they fetch one month ahead (the next statement) unless futureMonths says otherwise
+const RATE_LIMITED = new Set(['isracard', 'amex']);
+const futureMonthsFor = (a: AccountConfig) => a.futureMonths ?? (RATE_LIMITED.has(a.companyId) ? 1 : 2);
+const RETRY_AFTER_429_MS = Number(process.env.SCRAPE_RETRY_DELAY_MS ?? 120_000);
+const isRateLimited = (r: { errorMessage?: string }) => /Status: 429\b|Automation detected/.test(r.errorMessage ?? '');
 
 export interface Config {
   accounts: AccountConfig[];
@@ -156,10 +165,10 @@ export async function scrapeAll(config: Config, db: DB = getDb(), hooks: ScrapeH
     let pageStateAtClose: string | undefined;
 
     try {
-      const scraper = createScraper({
+      const makeScraper = () => createScraper({
         companyId: CompanyTypes[account.companyId],
         startDate,
-        futureMonthsToScrape: 2, // upcoming card charges and future installments
+        futureMonthsToScrape: futureMonthsFor(account), // upcoming card charges and future installments
         // per-transaction detail requests (e.g. Isracard PirteyIska_204) get rate-limited (HTTP 429) as automation
         additionalTransactionInformation: false,
         includeRawTransaction: true,
@@ -239,7 +248,14 @@ export async function scrapeAll(config: Config, db: DB = getDb(), hooks: ScrapeH
         },
       });
 
-      const result = await scraper.scrape(account.credentials as never);
+      let result = await makeScraper().scrape(account.credentials as never);
+      // rate-limited: wait, then one more try (a fresh login) before giving up on this company
+      if (!result.success && isRateLimited(result)) {
+        console.warn(`  ${account.companyId} is rate-limiting (HTTP 429); retrying once in ${Math.round(RETRY_AFTER_429_MS / 1000)}s…`);
+        await new Promise(r => setTimeout(r, RETRY_AFTER_429_MS));
+        pageStateAtClose = undefined;
+        result = await makeScraper().scrape(account.credentials as never);
+      }
 
       if (!result.success) {
         console.error(`Failed to scrape ${account.companyId}:`, result.errorType, result.errorMessage);
