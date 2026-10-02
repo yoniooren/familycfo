@@ -18,7 +18,12 @@ export function claudeCommand(): { command: string; prefixArgs: string[] } {
   }
   if (process.platform !== 'win32') return { command: 'claude', prefixArgs: [] };
 
-  const dirs = (process.env.PATH ?? '').split(delimiter).filter(Boolean);
+  // the native installer's location (%USERPROFILE%\\.local\\bin), also when a terminal opened before the install
+  // doesn't have it on its PATH yet
+  const dirs = [
+    ...(process.env.PATH ?? '').split(delimiter).filter(Boolean),
+    ...(process.env.USERPROFILE ? [join(process.env.USERPROFILE, '.local', 'bin')] : []),
+  ];
   for (const dir of dirs) {
     const exe = join(dir, 'claude.exe');
     if (existsSync(exe)) return { command: exe, prefixArgs: [] };
