@@ -1,8 +1,9 @@
-import type Database from 'better-sqlite3';
+import type { Database } from './sqlite.js';
 import { migrations } from './migrations.js';
+import { isMain } from '../isMain.js';
 
 /** Apply pending migrations in order, each in its own transaction. */
-export function runMigrations(db: Database.Database): number[] {
+export function runMigrations(db: Database): number[] {
   db.exec(`CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
@@ -26,8 +27,8 @@ export function runMigrations(db: Database.Database): number[] {
 }
 
 // `npm run migrate` — apply migrations to bank.db (or $BANK_DB) and report
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const { default: Database } = await import('better-sqlite3');
+if (isMain(import.meta.url)) {
+  const { Database } = await import('./sqlite.js');
   const db = new Database(process.env.BANK_DB || 'bank.db');
   const ran = runMigrations(db);
   console.log(ran.length ? `Applied migrations: ${ran.join(', ')}` : 'Database is up to date.');

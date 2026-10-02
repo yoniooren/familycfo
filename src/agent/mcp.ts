@@ -5,7 +5,7 @@
  *   api: GET an endpoint of the household API — the same numbers the screens show
  *   sql: a read-only SELECT on bank.db (opened read-only + query_only)
  */
-import Database from 'better-sqlite3';
+import { Database } from '../db/sqlite.js';
 import { createInterface } from 'readline';
 
 const DB_PATH = process.env.BANK_DB ?? 'bank.db';

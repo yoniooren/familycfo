@@ -80,7 +80,7 @@ It understands how Israeli money actually moves:
 
 ## Quick start — try the demo
 
-Requirements: **Node.js 20+** and npm (on Windows, Node 22 LTS is the safest choice), plus Git. macOS, Linux or Windows.
+Requirements: **Node.js 22.13+** (the database uses Node's built-in `node:sqlite`, so there is no native module to compile or to be blocked by Windows Smart App Control) and npm, plus Git. macOS, Linux or Windows.
 
 ```bash
 git clone https://github.com/nmazuz/familycfo.git && cd familycfo

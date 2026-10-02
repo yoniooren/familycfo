@@ -7,6 +7,7 @@
  */
 import { readFileSync } from 'fs';
 import { getDb, type DB } from '../db/connection.js';
+import { isMain } from '../isMain.js';
 
 type Returns = [number | null, number | null, number | null, number | null, number | null, number | null, number | null];
 interface Product {
@@ -128,7 +129,7 @@ export function importPensionReport(db: DB, report: Report): { assets: number; c
   return { assets: report.products.length, created, deposits, policies };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const file = process.argv[2];
   if (!file) {
     console.error('usage: npm run import:pension -- <report.json>');

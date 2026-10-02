@@ -8,6 +8,7 @@ import { refreshAlerts } from './analytics/alerts.js';
 import { refreshBoiRates } from './analytics/fx.js';
 import { refreshHistory, refreshQuotes } from './analytics/quotes.js';
 import { matchPlanned } from './analytics/planned.js';
+import { isMain } from './isMain.js';
 
 export interface PipelineOptions {
   /** rows to categorize; defaults to every uncategorized row */
@@ -40,7 +41,7 @@ export async function runPipeline(db: DB = getDb(), opts: PipelineOptions = {}):
 }
 
 // `npm run pipeline` — reprocess the database without scraping (set CATEGORY_API_URL to categorize via the API)
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const summary = await runPipeline(getDb(), { categoryApiUrl: process.env.CATEGORY_API_URL });
   console.log('Pipeline:', summary);
 }

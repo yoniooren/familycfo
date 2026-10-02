@@ -1,7 +1,7 @@
-import Database from 'better-sqlite3';
+import { Database } from './sqlite.js';
 import { runMigrations } from './migrate.js';
 
-export type DB = Database.Database;
+export type DB = Database;
 
 let instance: DB | undefined;
 

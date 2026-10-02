@@ -6,7 +6,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "scripts": {
     "postinstall": "npm --prefix web install",
@@ -25,7 +25,6 @@
     "dev:demo": "cross-env BANK_DB=demo.db npm run dev"
   },
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
     "fastify": "^5.12.5",
     "israeli-bank-scrapers": "^6.12.2",
     "node-cron": "^3.0.3",
@@ -33,7 +32,6 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
     "@types/node-cron": "^3.0.11",
     "tsx": "^4.19.0",

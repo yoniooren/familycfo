@@ -1,15 +1,15 @@
-import type Database from 'better-sqlite3';
+import type { Database } from './sqlite.js';
 
 export interface Migration {
   version: number;
   name: string;
-  up: (db: Database.Database) => void;
+  up: (db: Database) => void;
 }
 
-const tableExists = (db: Database.Database, name: string) =>
+const tableExists = (db: Database, name: string) =>
   !!db.prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name=?`).get(name);
 
-const columns = (db: Database.Database, table: string) =>
+const columns = (db: Database, table: string) =>
   (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(c => c.name);
 
 // Category name → kind / fixed flag for the categories the external API already produced

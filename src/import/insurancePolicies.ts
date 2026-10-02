@@ -12,6 +12,7 @@ import { basename, dirname, extname, join, resolve } from 'path';
 import { getDb, type DB } from '../db/connection.js';
 import { pickColumns, snake } from '../server/crud.js';
 import { POLICIES_DIR } from '../server/routes/insurance.js';
+import { isMain } from '../isMain.js';
 
 const COLUMNS = ['name', 'type', 'insurer', 'policyNumber', 'insuredMemberId', 'insuredDetails', 'premium', 'premiumFrequency',
   'paymentAccountId', 'matchPattern', 'startDate', 'endDate', 'coverage', 'deductible', 'agentName', 'agentPhone', 'agentEmail',
@@ -107,7 +108,7 @@ export function importInsurance(db: DB, spec: InsuranceImport, baseDir: string) 
   return { created, updated, documents, snapshots };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const file = process.argv[2];
   if (!file) {
     console.error('usage: npm run import:insurance -- <policies.json>');
