@@ -128,11 +128,33 @@ export function parseHarHabituach(sheet: Sheet): PolicyRow[] | null {
 const insuredLabel = (last4: string | null) => (last4 ? `ת.ז. …${last4}` : null);
 const nameOf = (r: PolicyRow) => r.product || r.subBranch || r.mainBranch || 'פוליסה';
 
+/**
+ * A name per row that is unique within its policy (insurer + number + insured). Har HaBituach lists several coverages
+ * of one policy under the same product name; each must stay its own row, or one would overwrite the other's premium.
+ * The first row keeps the plain product name (so files imported before this stay matched); a later one with the same
+ * name gets its details ("· …") or a number. The file's order is stable, so a re-import gives the same names.
+ */
+export function uniqueNames(rows: PolicyRow[]): string[] {
+  const used = new Set<string>();
+  const group = (r: PolicyRow) => `${r.insurer}|${r.policyNumber ?? ''}|${r.idLast4 ?? ''}`;
+  return rows.map(r => {
+    const base = nameOf(r);
+    const key = (name: string) => `${group(r)}|${name}`;
+    let name = base;
+    if (used.has(key(name)) && r.details) name = `${base} · ${r.details}`;
+    if (used.has(key(name)) && r.subBranch && r.subBranch !== base) name = `${base} · ${r.subBranch}`;
+    for (let n = 2; used.has(key(name)); n++) name = `${base} (${n})`;
+    used.add(key(name));
+    return name;
+  });
+}
+
 export function importHarHabituach(db: DB, rows: PolicyRow[], asOf: string): { created: number; updated: number } {
   let created = 0, updated = 0;
   db.transaction(() => {
-    for (const r of rows) {
-      const name = nameOf(r);
+    const names = uniqueNames(rows);
+    for (const [i, r] of rows.entries()) {
+      const name = names[i];
       const insured = insuredLabel(r.idLast4);
       const sourceNote = [
         [r.mainBranch, r.subBranch].filter(Boolean).join(' / '),

@@ -59,6 +59,31 @@ describe('Har HaBituach helpers', () => {
   });
 });
 
+describe('Har HaBituach: several coverages under one product name', () => {
+  it('keeps each row as its own policy with its own premium, and a re-import matches them again', async () => {
+    const db = testDb();
+    const dir = inbox();
+    const rows = [
+      ['012345678', 'ביטוח בריאות', 'בריאות', 'בריאות', 'הראל חברה לביטוח בע"מ', '01/01/2024 - 31/12/2026', 'ניתוחים', 40, 'חודשית', '9001', 'פרט'],
+      ['012345678', 'ביטוח בריאות', 'בריאות', 'בריאות', 'הראל חברה לביטוח בע"מ', '01/01/2024 - 31/12/2026', 'תרופות', 15, 'חודשית', '9001', 'פרט'],
+      ['012345678', 'ביטוח בריאות', 'בריאות', 'בריאות', 'הראל חברה לביטוח בע"מ', '01/01/2024 - 31/12/2026', 'תרופות', 7, 'חודשית', '9001', 'פרט'],
+      ['087654321', 'ביטוח בריאות', 'בריאות', 'בריאות', 'הראל חברה לביטוח בע"מ', '01/01/2024 - 31/12/2026', 'ניתוחים', 38, 'חודשית', '9001', 'פרט'],
+    ];
+    await xlsx(join(dir, 'a.xlsx'), HABITUACH_HEADER, rows);
+    const [r] = await processInbox(db, dir);
+    expect(r.summary).toContain('4 פוליסות חדשות, 0 עודכנו');
+    expect(db.prepare(`SELECT name, insured_details, premium FROM insurance_policies ORDER BY id`).all()).toEqual([
+      { name: 'בריאות', insured_details: 'ת.ז. …5678', premium: 40 },
+      { name: 'בריאות · תרופות', insured_details: 'ת.ז. …5678', premium: 15 },
+      { name: 'בריאות (2)', insured_details: 'ת.ז. …5678', premium: 7 },
+      { name: 'בריאות', insured_details: 'ת.ז. …4321', premium: 38 },
+    ]);
+    await xlsx(join(dir, 'b.xlsx'), HABITUACH_HEADER, rows);
+    const [again] = await processInbox(db, dir);
+    expect(again.summary).toContain('0 פוליסות חדשות, 4 עודכנו');
+  });
+});
+
 describe('inbox', () => {
   it('imports a Har HaBituach export into policies, and a newer one updates them without touching user edits', async () => {
     const db = testDb();
