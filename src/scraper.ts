@@ -1,6 +1,7 @@
 import { createScraper, CompanyTypes } from 'israeli-bank-scrapers';
 import { getDb, type DB } from './db/connection.js';
 import { saveScrapedAccount, recordScrapeRun } from './db/ingestRepo.js';
+import { DiscountWithPortfolio, saveDiscountPortfolio, type Portfolio } from './discountPortfolio.js';
 import * as readline from 'readline';
 import type { Page } from 'puppeteer';
 import { existsSync } from 'fs';
@@ -165,7 +166,7 @@ export async function scrapeAll(config: Config, db: DB = getDb(), hooks: ScrapeH
     let pageStateAtClose: string | undefined;
 
     try {
-      const makeScraper = () => createScraper({
+      const scraperOptions: Parameters<typeof createScraper>[0] = {
         companyId: CompanyTypes[account.companyId],
         startDate,
         futureMonthsToScrape: futureMonthsFor(account), // upcoming card charges and future installments
@@ -246,7 +247,11 @@ export async function scrapeAll(config: Config, db: DB = getDb(), hooks: ScrapeH
             startOtpWatcher(page, ask).catch(() => {}); // Fire and forget
           }
         },
-      });
+      };
+      // Discount: the library's scraper plus the securities portfolio (src/discountPortfolio.ts)
+      const makeScraper = () => (account.companyId === 'discount'
+        ? new DiscountWithPortfolio(scraperOptions) as unknown as ReturnType<typeof createScraper>
+        : createScraper(scraperOptions));
 
       let result = await makeScraper().scrape(account.credentials as never);
       // rate-limited: wait, then one more try (a fresh login) before giving up on this company
@@ -275,6 +280,13 @@ export async function scrapeAll(config: Config, db: DB = getDb(), hooks: ScrapeH
         const label = acc.savingsAccount ? ' (savings deposit)' : '';
         console.log(`  ${saved.accountId}${label}: balance ${acc.balance ?? '-'} ${acc.currency ?? 'ILS'}, ${saved.insertedIds.length} new, ${saved.updated} updated`);
       }
+      // Discount's securities portfolio → holdings on the investments page (best effort; never fails the bank scrape)
+      const extra = result as { portfolios?: Portfolio[]; portfolioErrors?: string[] };
+      for (const p of extra.portfolios ?? []) {
+        const r = saveDiscountPortfolio(db, p, new Date().toISOString().slice(0, 10));
+        if (r.saved || r.archived) console.log(`  securities portfolio …${p.accountNumber.slice(-4)}: ${r.saved} holdings${r.archived ? `, ${r.archived} no longer held` : ''}`);
+      }
+      for (const e of extra.portfolioErrors ?? []) console.warn(`  securities portfolio not read (${e.replace(/\d{5,}/g, '…')})`);
       recordScrapeRun(db, { company: account.companyId, startedAt, success: true, newTransactions: newIds.length });
       summaries.push({ company: account.companyId, success: true, newTransactionIds: newIds });
       hooks.onProgress?.({ type: 'done', company: account.companyId, success: true, newTransactions: newIds.length });
