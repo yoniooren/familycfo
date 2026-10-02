@@ -26,6 +26,7 @@
     "dev:demo": "cross-env BANK_DB=demo.db npm run dev"
   },
   "dependencies": {
+    "@zip.js/zip.js": "^2.22.0",
     "exceljs": "^4.4.0",
     "fastify": "^5.12.5",
     "israeli-bank-scrapers": "^6.12.2",

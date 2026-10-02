@@ -62,11 +62,11 @@ export default function Pension() {
 
       <div className="grid grid-cols-2 gap-3 max-[22.5rem]:grid-cols-1 md:gap-4 lg:grid-cols-4">
         <Stat index={0} icon={PiggyBank} label="סך החיסכון" value={totals.value}
-          hint={s ? <>תשואה מתחילת השנה <span className="font-semibold text-positive">{s.ytdReturnPct}%</span></> : undefined} />
+          hint={s?.ytdReturnPct != null ? <>תשואה מתחילת השנה <span className="font-semibold text-positive">{s.ytdReturnPct}%</span></> : undefined} />
         <Stat index={1} icon={HandCoins} color="var(--chart-5)" label="הפקדות חודשיות" value={totals.monthlyDeposits}
           hint={`${totals.active} מוצרים פעילים מתוך ${products.length}`} />
-        <Stat index={2} icon={Umbrella} color="var(--chart-6)" label="קצבה חודשית צפויה בפרישה" value={s?.expectedAnnuity.totalWithoutDeposits ?? totals.expectedAnnuity}
-          hint={s ? <>בלי הפקדות נוספות · אם ההפקדות ימשיכו: <Money value={s.expectedAnnuity.pensionWithDeposits + s.expectedAnnuity.managers} /></> : undefined} />
+        <Stat index={2} icon={Umbrella} color="var(--chart-6)" label="קצבה חודשית צפויה בפרישה" value={s?.expectedAnnuity?.totalWithoutDeposits ?? totals.expectedAnnuity}
+          hint={s?.expectedAnnuity ? <>בלי הפקדות נוספות · אם ההפקדות ימשיכו: <Money value={s.expectedAnnuity.pensionWithDeposits + s.expectedAnnuity.managers} /></> : undefined} />
         <Stat index={3} icon={Banknote} color="var(--chart-2)" label="קרנות השתלמות נזילות היום" value={totals.liquidStudyFunds.value}
           hint={`${totals.liquidStudyFunds.count} קרנות, שעברו 6 שנים מההצטרפות (פטור ממס)`} />
       </div>
@@ -78,10 +78,10 @@ export default function Pension() {
             const Icon = TYPE_ICONS[g.type];
             return { key: g.type, name: SHORT_LABELS[g.type], value: totals.byType[g.type] ?? 0, icon: <Icon /> };
           })} />
-          {s && (
+          {!!s?.byProvider?.length && (
             <div className="mt-3 space-y-1.5 border-t border-line-soft pt-3 text-sm">
               <div className="text-xs font-medium text-fg-subtle">לפי גוף מנהל</div>
-              {s.byProvider.map(p => (
+              {s.byProvider!.map(p => (
                 <div key={p.name} className="flex items-center justify-between gap-2">
                   <span className="truncate">{p.name}</span>
                   <span className="shrink-0 text-fg-subtle"><Money value={p.amount} /> · {p.pct}%</span>
@@ -91,7 +91,7 @@ export default function Pension() {
           )}
         </div>
 
-        {s && (
+        {s?.exposurePct && s.tradedPct && s.assetMixPct && (
           <div className="card min-w-0">
             <SectionTitle icon={Globe} color="var(--chart-5)">חשיפה ותמהיל השקעה</SectionTitle>
             <div className="space-y-3">
@@ -103,7 +103,7 @@ export default function Pension() {
               ))}
             </div>
             <div className="mt-4 space-y-1 border-t border-line-soft pt-3 text-sm">
-              {s.assetMixPct.filter(a => a.pct > 0).map(a => (
+              {s.assetMixPct!.filter(a => a.pct > 0).map(a => (
                 <div key={a.name} className="flex justify-between gap-2"><span className="truncate text-fg-muted">{a.name}</span><span className="num">{a.pct}%</span></div>
               ))}
             </div>
@@ -122,8 +122,8 @@ export default function Pension() {
               <li><b>{totals.liquidStudyFunds.count} קרנות השתלמות כבר נזילות</b> (<Money value={totals.liquidStudyFunds.value} />).
                 {nextLiquid[0] && <> הבאה תהיה נזילה ב-{fullDate(nextLiquid[0].liquidityDate)}.</>}</li>
             )}
-            {s && s.coverage.noInfo.length > 0 && (
-              <li>בדוח אין מידע על: {s.coverage.noInfo.join(', ')}. אם יש לכם ביטוחים כאלה (למשל בקופת חולים או דרך הבנק), אפשר להוסיף אותם ב<Link to="/insurance" className="underline">ביטוחים</Link>.</li>
+            {!!s?.coverage?.noInfo?.length && (
+              <li>בדוח אין מידע על: {s!.coverage!.noInfo.join(', ')}. אם יש לכם ביטוחים כאלה (למשל בקופת חולים או דרך הבנק), אפשר להוסיף אותם ב<Link to="/insurance" className="underline">ביטוחים</Link>.</li>
             )}
           </ul>
           <p className="mt-3 text-xs text-fg-subtle">עובדות מהדוח בלבד, לא המלצה. לשינוי מסלול, איחוד קופות או ניוד — כדאי לדבר עם יועץ פנסיוני{s?.agent ? ` (${s.agent.name})` : ''}.</p>

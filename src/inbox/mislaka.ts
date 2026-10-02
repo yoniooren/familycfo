@@ -14,7 +14,7 @@
  * Accounts with no savings (pure risk insurance — already on the insurance page via Har HaBituach) are skipped.
  * Nothing here leaves the computer.
  */
-import JSZip from 'jszip';
+import { configure, Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
 import { mkdirSync, writeFileSync } from 'fs';
 import { basename, join } from 'path';
 import type { DB } from '../db/connection.js';
@@ -141,22 +141,49 @@ export function parseMimshak(xml: string, fileType = ''): { accounts: MislakaAcc
   return { accounts, skipped, reportDate };
 }
 
-/** The XMLs of a Mislaka ZIP (or one XML), the other files kept aside. */
-export async function readMislaka(fileName: string, bytes: Buffer): Promise<{ xmls: { name: string; xml: string }[]; extras: { name: string; bytes: Uint8Array }[] }> {
-  if (/\.xml$/i.test(fileName)) return { xmls: [{ name: fileName, xml: decodeXml(bytes) }], extras: [] };
-  const zip = await JSZip.loadAsync(bytes);
-  const xmls: { name: string; xml: string }[] = [];
-  const extras: { name: string; bytes: Uint8Array }[] = [];
-  for (const f of Object.values(zip.files)) {
-    if (f.dir) continue;
-    const data = await f.async('uint8array');
-    if (/\.xml$/i.test(f.name)) {
-      const xml = decodeXml(data);
-      if (isMimshak(xml)) { xmls.push({ name: basename(f.name), xml }); continue; }
-    }
-    if (/\.(pdf|xls|xlsx)$/i.test(f.name)) extras.push({ name: basename(f.name), bytes: data });
+configure({ useWebWorkers: false });
+
+/** The ZIP is locked and no (or a wrong) password was given. The clearing house locks it with the last 4 digits of the card it charged. */
+export class ZipPasswordError extends Error {
+  constructor(readonly wrong: boolean) {
+    super(wrong ? 'הקוד לא נכון. הקוד הוא 4 הספרות האחרונות של כרטיס האשראי שחויב בהזמנת הדוח'
+      : 'קובץ ה-ZIP נעול בקוד. העלו אותו דרך כפתור הוספת הקובץ והקלידו את 4 הספרות האחרונות של כרטיס האשראי שחויב בהזמנת הדוח');
   }
-  return { xmls, extras };
+}
+
+/**
+ * The XMLs of a Mislaka ZIP (or one XML), the other files kept aside. A locked ZIP (ZipCrypto or AES) needs
+ * `password`; it's used only to open the file here and isn't stored anywhere.
+ */
+export async function readMislaka(fileName: string, bytes: Buffer, password?: string):
+  Promise<{ xmls: { name: string; xml: string }[]; extras: { name: string; bytes: Uint8Array }[] }> {
+  if (/\.xml$/i.test(fileName)) return { xmls: [{ name: fileName, xml: decodeXml(bytes) }], extras: [] };
+  const reader = new ZipReader(new Uint8ArrayReader(new Uint8Array(bytes)));
+  try {
+    const entries = (await reader.getEntries()).filter(e => !e.directory);
+    if (entries.some(e => e.encrypted) && !password) throw new ZipPasswordError(false);
+    const xmls: { name: string; xml: string }[] = [];
+    const extras: { name: string; bytes: Uint8Array }[] = [];
+    for (const e of entries) {
+      if (!/\.(xml|pdf|xls|xlsx)$/i.test(e.filename)) continue;
+      let data: Uint8Array;
+      try {
+        data = await e.getData!(new Uint8ArrayWriter(), e.encrypted ? { password } : {});
+      } catch (err) {
+        if (/password|encrypted/i.test(String((err as Error).message))) throw new ZipPasswordError(true);
+        throw err;
+      }
+      const name = basename(e.filename);
+      if (/\.xml$/i.test(name)) {
+        const xml = decodeXml(data);
+        if (isMimshak(xml)) { xmls.push({ name, xml }); continue; }
+      }
+      if (!/\.xml$/i.test(name)) extras.push({ name, bytes: data });
+    }
+    return { xmls, extras };
+  } finally {
+    await reader.close();
+  }
 }
 
 const fileTypeOf = (name: string) => name.match(/_(KGM|PNN|INP|ING|[A-Z]{3})_\d{8,}/)?.[1] ?? '';
@@ -191,6 +218,10 @@ export function importMislaka(db: DB, xmls: { name: string; xml: string }[], ext
         amount: Math.round(accounts.filter(a => a.type === t).reduce((s, a) => s + a.balance, 0)),
         pct: total ? Math.round((accounts.filter(a => a.type === t).reduce((s, a) => s + a.balance, 0) / total) * 1000) / 10 : 0,
       })).filter(x => x.amount),
+      byProvider: [...new Set(accounts.map(a => a.provider))].map(name => {
+        const amount = accounts.filter(a => a.provider === name).reduce((sum, a) => sum + a.balance, 0);
+        return { name, amount: Math.round(amount), pct: total ? Math.round((amount / total) * 1000) / 10 : 0 };
+      }).sort((a, b) => b.amount - a.amount),
     },
     products: accounts.map(a => ({
       type: a.type, name: a.name, provider: a.provider, policyNumber: a.policyNumber || `${a.provider}-${a.name}`, balance: a.balance,

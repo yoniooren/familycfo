@@ -2,6 +2,8 @@ import { existsSync, mkdtempSync, readdirSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import JSZip from 'jszip';
+import { configure, Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
+import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import { testDb } from './helpers.js';
 
@@ -93,5 +95,59 @@ describe('Mislaka report in the inbox', () => {
     const xml = mimshak('הראל', '', account({ plan: 'הראל השתלמות', number: 'X', tracks: [['כללי', 1000]], components: [1000, 1000] }));
     const { accounts } = parseMimshak(xml, 'KGM');
     expect(accounts[0]).toMatchObject({ balance: 1000, balanceCheck: 'mismatch', type: 'keren_hishtalmut' });
+  });
+
+  /** The same report, locked the way the clearing house does (its code: the card's last 4 digits). */
+  async function locked(opts: { zipCrypto?: boolean; encryptionStrength?: 1 | 2 | 3 }): Promise<Buffer> {
+    configure({ useWebWorkers: false });
+    const plain = await JSZip.loadAsync(await report());
+    const w = new ZipWriter(new Uint8ArrayWriter(), { password: '4321', ...opts });
+    for (const f of Object.values(plain.files)) await w.add(f.name, new Uint8ArrayReader(await f.async('uint8array')));
+    return Buffer.from(await w.close());
+  }
+
+  for (const opts of [{ zipCrypto: true }, { encryptionStrength: 3 as const }]) {
+    it(`asks for the code of a locked ZIP and imports it with the right one (${JSON.stringify(opts)})`, async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'fcfo-lk-'));
+      process.env.REPORTS_DIR = mkdtempSync(join(tmpdir(), 'fcfo-r-'));
+      const { handleFile, processInbox } = await import('../src/inbox/index.js');
+      const db = testDb();
+      const bytes = await locked(opts);
+
+      // dropped into the folder: no one to ask → failed/, with how to open it
+      writeFileSync(join(dir, 'm.zip'), bytes);
+      const [dropped] = await processInbox(db, dir);
+      expect(dropped).toMatchObject({ ok: false });
+      expect(dropped.summary).toContain('נעול');
+
+      // uploaded: asks, a wrong code asks again, the right one imports
+      const up = (name: string) => { const p = join(dir, `.upload-${name}`); writeFileSync(p, bytes); return p; };
+      const ask = await handleFile(db, dir, up('a.zip'), 'a.zip', { askPassword: true });
+      expect(ask).toMatchObject({ ok: false, needsPassword: true });
+      expect(existsSync(join(dir, '.upload-a.zip'))).toBe(false); // not left behind, not moved to failed/
+      const wrong = await handleFile(db, dir, up('b.zip'), 'b.zip', { askPassword: true, password: '0000' });
+      expect(wrong).toMatchObject({ ok: false, needsPassword: true });
+      expect(wrong.summary).toContain('הקוד לא נכון');
+      const right = await handleFile(db, dir, up('c.zip'), 'c.zip', { askPassword: true, password: '4321' });
+      expect(right).toMatchObject({ ok: true, kind: 'המסלקה הפנסיונית' });
+      expect(db.prepare(`SELECT COUNT(*) FROM assets`).pluck().get()).toBe(2);
+    });
+  }
+
+  it('takes the code from the X-Zip-Password header on upload', async () => {
+    process.env.INBOX_DIR = mkdtempSync(join(tmpdir(), 'fcfo-h-'));
+    process.env.REPORTS_DIR = mkdtempSync(join(tmpdir(), 'fcfo-r-'));
+    const { inboxRoutes } = await import('../src/server/routes/inbox.js');
+    const { insuranceRoutes } = await import('../src/server/routes/insurance.js');
+    const db = testDb();
+    const app = Fastify();
+    insuranceRoutes(app, db);
+    inboxRoutes(app, db);
+    await app.ready();
+    const payload = await locked({ zipCrypto: true });
+    const post = (headers: Record<string, string>) => app.inject({ method: 'POST', url: '/api/inbox?name=m.zip',
+      headers: { 'content-type': 'application/octet-stream', ...headers }, payload });
+    expect((await post({})).json()).toMatchObject({ needsPassword: true });
+    expect((await post({ 'x-zip-password': '4321' })).json()).toMatchObject({ ok: true });
   });
 });

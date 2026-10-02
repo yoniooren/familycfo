@@ -8,7 +8,7 @@
  * After a file is handled it moves to inbox/processed/ (or inbox/failed/ with a .txt saying why), and an alert
  * says what was imported. The API server watches the folder while it runs; `npm run inbox` processes it once.
  */
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, watch, writeFileSync } from 'fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'fs';
 import { basename, extname, join, resolve } from 'path';
 import type { DB } from '../db/connection.js';
 import { today } from '../analytics/common.js';
@@ -16,11 +16,15 @@ import { readTable } from './readTable.js';
 import { exportDateOf, importHarHabituach, parseHarHabituach } from './harHabituach.js';
 import { importHarHakesef, parseHarHakesef } from './harHakesef.js';
 import { isMain } from '../isMain.js';
-import { importMislaka, readMislaka } from './mislaka.js';
+import { importMislaka, readMislaka, ZipPasswordError } from './mislaka.js';
 
 export const INBOX_DIR = resolve(process.env.INBOX_DIR ?? join('data', 'inbox'));
 
-export interface InboxResult { file: string; ok: boolean; kind?: string; summary: string; locked?: boolean }
+export interface InboxResult {
+  file: string; ok: boolean; kind?: string; summary: string; locked?: boolean;
+  /** a locked ZIP: the upload can be sent again with its code (the file is not moved to failed/) */
+  needsPassword?: boolean;
+}
 
 /** Files still being written / downloaded, editor lock files, our own folders and notes. */
 const ignored = (name: string) => /^[.~]|\.(crdownload|part|partial|tmp|download)$/i.test(name) || /^~\$/.test(name);
@@ -49,10 +53,10 @@ function locked(path: string): boolean {
 }
 
 /** Recognize and import one file. Throws with a Hebrew explanation when it can't. */
-export async function importFile(db: DB, path: string): Promise<{ kind: string; summary: string }> {
+export async function importFile(db: DB, path: string, opts: { password?: string } = {}): Promise<{ kind: string; summary: string }> {
   const asOf = today();
   if (/\.(zip|xml)$/i.test(path)) {
-    const { xmls, extras } = await readMislaka(basename(path), readFileSync(path));
+    const { xmls, extras } = await readMislaka(basename(path), readFileSync(path), opts.password);
     if (!xmls.length) throw new Error('לא נמצאו בקובץ קבצי XML של המסלקה הפנסיונית (ממשק אחיד)');
     const r = importMislaka(db, xmls, extras, asOf);
     if (!r.accounts.length) throw new Error(`זוהה כדוח של המסלקה, אבל לא נמצאו בו מוצרים עם חיסכון (${r.skipped} בלי יתרה)`);
@@ -91,17 +95,23 @@ export async function importFile(db: DB, path: string): Promise<{ kind: string; 
  * Import one file and file it away: processed/ when it was imported, failed/ (+ a .txt with the reason) when not.
  * `name` is the file name shown to the user and kept in the moved file's name.
  */
-export async function handleFile(db: DB, dir: string, path: string, name: string): Promise<InboxResult> {
+export async function handleFile(db: DB, dir: string, path: string, name: string,
+  opts: { password?: string; askPassword?: boolean } = {}): Promise<InboxResult> {
   // open in Excel (Windows locks it): leave it for the next round instead of importing it twice
   if (locked(path)) return { file: name, ok: false, summary: 'הקובץ פתוח בתוכנה אחרת — ייובא אחרי שייסגר', locked: true };
   try {
-    const r = await importFile(db, path);
+    const r = await importFile(db, path, { password: opts.password });
     mkdirSync(join(dir, 'processed'), { recursive: true });
     renameSync(path, join(dir, 'processed', stamp(name)));
     note(db, true, name, `${r.kind}: ${r.summary}`);
     return { file: name, ok: true, kind: r.kind, summary: r.summary };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
+    // uploaded through the button: ask for the code instead of failing the file
+    if (err instanceof ZipPasswordError && opts.askPassword) {
+      rmSync(path, { force: true });
+      return { file: name, ok: false, summary: reason, needsPassword: true };
+    }
     const failed = join(dir, 'failed');
     mkdirSync(failed, { recursive: true });
     const moved = stamp(name);

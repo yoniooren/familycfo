@@ -204,14 +204,15 @@ export interface PensionProduct {
   deposits: { valueDate: string; salaryMonth: string | null; salary: number | null; employee: number | null; employer: number | null; severance: number | null; total: number }[];
 }
 export interface PensionReportSummary {
-  totalSavings: number; ytdReturnPct: number; lifeHealthMonthlyPremium: number;
-  byProductType: { name: string; amount: number; pct: number }[]; byProvider: { name: string; amount: number; pct: number }[];
-  tradedPct: { traded: number; nonTraded: number }; exposurePct: { stocks: number; abroad: number; foreignCurrency: number };
-  assetMixPct: { name: string; pct: number }[];
-  monthlyDeposits: Record<string, number> & { total: number };
-  expectedAnnuity: { pensionWithoutDeposits: number; pensionWithDeposits: number; managers: number; totalWithoutDeposits: number };
-  coverage: { disability: number; death: number; noInfo: string[] };
-  agent: { name: string; agency?: string; phone?: string; email?: string } | null; issuedAt: string | null;
+  // an agent's report states all of these; the clearing house report only some — every field but the total is optional
+  totalSavings: number; ytdReturnPct?: number; lifeHealthMonthlyPremium?: number;
+  byProductType?: { name: string; amount: number; pct: number }[]; byProvider?: { name: string; amount: number; pct: number }[];
+  tradedPct?: { traded: number; nonTraded: number }; exposurePct?: { stocks: number; abroad: number; foreignCurrency: number };
+  assetMixPct?: { name: string; pct: number }[];
+  monthlyDeposits?: Record<string, number> & { total: number };
+  expectedAnnuity?: { pensionWithoutDeposits: number; pensionWithDeposits: number; managers: number; totalWithoutDeposits: number };
+  coverage?: { disability: number; death: number; noInfo: string[] };
+  agent?: { name: string; agency?: string; phone?: string; email?: string } | null; issuedAt?: string | null;
 }
 export interface PensionOverview {
   products: PensionProduct[];
