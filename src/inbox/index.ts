@@ -13,7 +13,7 @@ import { basename, extname, join, resolve } from 'path';
 import type { DB } from '../db/connection.js';
 import { today } from '../analytics/common.js';
 import { readTable } from './readTable.js';
-import { importHarHabituach, parseHarHabituach } from './harHabituach.js';
+import { exportDateOf, importHarHabituach, parseHarHabituach } from './harHabituach.js';
 import { importHarHakesef, parseHarHakesef } from './harHakesef.js';
 import { isMain } from '../isMain.js';
 
@@ -55,7 +55,7 @@ export async function importFile(db: DB, path: string): Promise<{ kind: string; 
     const policies = parseHarHabituach(sheet);
     if (policies) {
       if (!policies.length) throw new Error('זוהה כקובץ של הר הביטוח, אבל אין בו שורות');
-      const r = importHarHabituach(db, policies, asOf);
+      const r = importHarHabituach(db, policies, exportDateOf(sheet) ?? asOf);
       return { kind: 'הר הביטוח', summary: `${policies.length} שורות: ${r.created} פוליסות חדשות, ${r.updated} עודכנו — בדף ביטוחים` };
     }
     const funds = parseHarHakesef(sheet);
@@ -151,8 +151,13 @@ export function watchInbox(db: DB, dir = INBOX_DIR, log: (s: string) => void = c
   return () => { clearTimeout(timer); watcher.close(); };
 }
 
-// `npm run inbox` — process what's waiting, once
-if (isMain(import.meta.url)) {
+// `npm run inbox` — process what's waiting, once; `npm run inbox -- --inspect <file.xlsx>` prints a file's structure
+// (part names and XML tags, no values) for diagnosing one that can't be read
+if (isMain(import.meta.url) && process.argv[2] === '--inspect') {
+  const { readFileSync } = await import('fs');
+  const { describeXlsx } = await import('./xlsxFallback.js');
+  console.log(await describeXlsx(readFileSync(process.argv[3])));
+} else if (isMain(import.meta.url)) {
   const { getDb } = await import('../db/connection.js');
   const results = await processInbox(getDb());
   if (!results.length) console.log(`Nothing in ${INBOX_DIR}`);

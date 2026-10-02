@@ -186,7 +186,9 @@ while `npm run dev` is running, it's recognized by its header row and imported (
 
 A handled file moves to `data/inbox/processed/`; one that isn't recognized moves to `data/inbox/failed/` next to a
 `.txt` saying why, and an alert says what happened. A file that's open in Excel waits until it's closed. Hebrew CSVs
-in windows-1255 are read too. `INBOX_DIR` changes the folder.
+in windows-1255 are read too, as are `.xlsx` files written by tools other than Excel (parts at other paths, prefixed XML)
+and "Excel" exports that are really HTML tables. If a file still can't be read, `npm run inbox -- --inspect <file>` prints
+its structure (part names and XML tags, no values) to send for a fix. `INBOX_DIR` changes the folder.
 
 ## Importing pension and insurance reports
 

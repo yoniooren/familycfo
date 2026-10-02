@@ -27,9 +27,17 @@ const KESEF_ROWS = [
 async function xlsx(path: string, header: unknown[], rows: unknown[][], { titleRows = 0 } = {}) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Sheet1', { views: [{ rightToLeft: true }] });
-  for (let i = 0; i < titleRows; i++) ws.addRow(['דוח מוצרים — הופק לצורך בדיקה']);
+  // the real Har HaBituach layout: a blank row, the title with the export date, a blank row, the header,
+  // then the rows in sections ("תחום - …" rows with nothing else)
+  if (titleRows) {
+    ws.addRow([]);
+    ws.addRow([null, "התיק הביטוחי, הופק מאתר 'הר הביטוח' של משרד האוצר, בתאריך", null, null, null, '28/09/2026']);
+    ws.addRow([]);
+  }
   ws.addRow(header);
+  if (titleRows) ws.addRow([null, 'תחום - כללי']);
   for (const r of rows) ws.addRow(r);
+  if (titleRows) ws.addRow([null, 'תחום - חיים ואבדן כושר עבודה']);
   await wb.xlsx.writeFile(path);
 }
 const inbox = () => mkdtempSync(join(tmpdir(), 'fcfo-inbox-'));
@@ -68,6 +76,7 @@ describe('inbox', () => {
     });
     expect(policies[2]).toMatchObject({ type: 'car', premium: 3200, premium_frequency: 'yearly', match_pattern: 'ביטוח ישיר' });
     expect(policies[3]).toMatchObject({ type: 'mortgage' });
+    expect(policies[0].notes).toContain('הר הביטוח (2026-09-28)'); // the export's own date
     // the full ID number is never stored
     expect(JSON.stringify(policies)).not.toContain('012345678');
 

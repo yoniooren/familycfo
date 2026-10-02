@@ -85,6 +85,16 @@ export function insurerKeyword(insurer: string): string {
   return words[0] ?? insurer;
 }
 
+/** The export's own date ("התיק הביטוחי, הופק ... בתאריך" | 02/10/2026), above the header row. */
+export function exportDateOf(sheet: Sheet): string | null {
+  const h = findHeader(sheet.rows, HAR_HABITUACH_HEADERS);
+  for (const row of sheet.rows.slice(0, h?.index ?? 10)) {
+    if (!row.some(c => typeof c === 'string' && c.includes('הופק'))) continue;
+    for (const c of row) { const d = parseDates(c)[0]; if (d) return d; }
+  }
+  return null;
+}
+
 export function parseHarHabituach(sheet: Sheet): PolicyRow[] | null {
   const h = findHeader(sheet.rows, HAR_HABITUACH_HEADERS);
   if (!h) return null;

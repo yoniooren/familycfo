@@ -6,6 +6,7 @@
 import { readFileSync } from 'fs';
 import { extname } from 'path';
 import ExcelJS from 'exceljs';
+import { readXlsxTolerant } from './xlsxFallback.js';
 
 export type Cell = string | number | null;
 export interface Sheet { name: string; rows: Cell[][] }
@@ -26,7 +27,18 @@ function cellValue(v: ExcelJS.CellValue): Cell {
   return String(v).trim() || null;
 }
 
+/** exceljs first; files it can't open (written by other tools) go through the tolerant reader. */
 async function readXlsx(path: string): Promise<Sheet[]> {
+  try {
+    const sheets = await readXlsxWithExceljs(path);
+    if (sheets.length) return sheets;
+  } catch {
+    // fall through
+  }
+  return readXlsxTolerant(readFileSync(path));
+}
+
+async function readXlsxWithExceljs(path: string): Promise<Sheet[]> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(path);
   return wb.worksheets.map(ws => {
@@ -67,8 +79,22 @@ function decode(buf: Buffer): string {
   return utf8.includes('�') ? new TextDecoder('windows-1255').decode(buf) : utf8;
 }
 
+/** An "Excel" export that is really an HTML table (some sites do this): its <tr>/<td> rows. */
+export function parseHtmlTable(html: string): Cell[][] {
+  const text = (s: string) => s.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ').trim();
+  return [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map(tr =>
+    [...tr[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(td => text(td[1]) || null));
+}
+
 export async function readTable(path: string): Promise<Sheet[]> {
   const ext = extname(path).toLowerCase();
+  if (ext === '.xlsx' || ext === '.xls') {
+    const head = readFileSync(path).subarray(0, 512);
+    const isZip = head[0] === 0x50 && head[1] === 0x4b; // "PK"
+    if (!isZip && /<(html|table|tr)\b/i.test(decode(head))) return [{ name: 'html', rows: parseHtmlTable(decode(readFileSync(path))) }];
+  }
   if (ext === '.xlsx') return readXlsx(path);
   if (ext === '.csv') return [{ name: 'csv', rows: parseCsv(decode(readFileSync(path))) }];
   if (ext === '.xls') throw new Error('קובץ ‎.xls הישן לא נתמך — פתחו אותו ב-Excel ושמרו בשם כ-‎.xlsx');
