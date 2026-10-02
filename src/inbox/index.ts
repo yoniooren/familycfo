@@ -8,7 +8,7 @@
  * After a file is handled it moves to inbox/processed/ (or inbox/failed/ with a .txt saying why), and an alert
  * says what was imported. The API server watches the folder while it runs; `npm run inbox` processes it once.
  */
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, renameSync, statSync, watch, writeFileSync } from 'fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, watch, writeFileSync } from 'fs';
 import { basename, extname, join, resolve } from 'path';
 import type { DB } from '../db/connection.js';
 import { today } from '../analytics/common.js';
@@ -16,6 +16,7 @@ import { readTable } from './readTable.js';
 import { exportDateOf, importHarHabituach, parseHarHabituach } from './harHabituach.js';
 import { importHarHakesef, parseHarHakesef } from './harHakesef.js';
 import { isMain } from '../isMain.js';
+import { importMislaka, readMislaka } from './mislaka.js';
 
 export const INBOX_DIR = resolve(process.env.INBOX_DIR ?? join('data', 'inbox'));
 
@@ -49,8 +50,23 @@ function locked(path: string): boolean {
 
 /** Recognize and import one file. Throws with a Hebrew explanation when it can't. */
 export async function importFile(db: DB, path: string): Promise<{ kind: string; summary: string }> {
-  const sheets = await readTable(path);
   const asOf = today();
+  if (/\.(zip|xml)$/i.test(path)) {
+    const { xmls, extras } = await readMislaka(basename(path), readFileSync(path));
+    if (!xmls.length) throw new Error('לא נמצאו בקובץ קבצי XML של המסלקה הפנסיונית (ממשק אחיד)');
+    const r = importMislaka(db, xmls, extras, asOf);
+    if (!r.accounts.length) throw new Error(`זוהה כדוח של המסלקה, אבל לא נמצאו בו מוצרים עם חיסכון (${r.skipped} בלי יתרה)`);
+    const active = r.accounts.filter(a => a.status === 'active').length;
+    const fmt = (n: number) => `₪${Math.round(n).toLocaleString('he-IL')}`;
+    return {
+      kind: 'המסלקה הפנסיונית',
+      summary: `${r.accounts.length} מוצרים (${active} פעילים, ${r.accounts.length - active} לא פעילים), סה"כ ${fmt(r.total)} נכון ל-${r.asOf}`
+        + ` · ${r.created} חדשים — בדף פנסיה וגמל`
+        + (r.skipped ? ` · ${r.skipped} פוליסות בלי חיסכון לא יובאו` : '')
+        + (r.mismatch ? ` · שימו לב: ב-${r.mismatch} מוצרים סכום הרכיבים לא תאם לסכום המסלולים, נלקח סכום המסלולים — כדאי להשוות ל-PDF` : ''),
+    };
+  }
+  const sheets = await readTable(path);
   for (const sheet of sheets) {
     const policies = parseHarHabituach(sheet);
     if (policies) {

@@ -28,7 +28,8 @@ interface Policy {
   startDate?: string | null; matchPattern?: string | null; coverage?: string | null; notes?: string | null;
 }
 interface Report {
-  asOf: string; member: string; source: string; file?: string; issuedAt?: string;
+  /** a member name, or null when the report doesn't say whose it is (the owner is then set on the page) */
+  asOf: string; member: string | null; source: string; file?: string; issuedAt?: string;
   agent?: { name: string; agency?: string; phone?: string; email?: string };
   summary: Record<string, unknown> & { totalSavings: number };
   products: Product[];
@@ -43,8 +44,9 @@ function feeText(p: Product): string | null {
 }
 
 export function importPensionReport(db: DB, report: Report): { assets: number; created: number; deposits: number; policies: number } {
-  const memberId = db.prepare(`SELECT id FROM members WHERE name = ?`).pluck().get(report.member) as number | undefined;
-  if (memberId == null) throw new Error(`member not found: ${report.member}`);
+  const memberId = report.member == null ? null
+    : db.prepare(`SELECT id FROM members WHERE name = ?`).pluck().get(report.member) as number | undefined;
+  if (memberId === undefined) throw new Error(`member not found: ${report.member}`);
   const sum = report.products.reduce((s, p) => s + p.balance, 0);
   if (Math.abs(sum - report.summary.totalSavings) > 2) {
     throw new Error(`products add up to ${sum}, the report says ${report.summary.totalSavings} — check the extraction`);
@@ -120,6 +122,8 @@ export function importPensionReport(db: DB, report: Report): { assets: number; c
       policies++;
     }
 
+    // UNIQUE (as_of, member_id, source) doesn't catch a NULL member — replace that one by hand
+    if (memberId == null) db.prepare(`DELETE FROM pension_reports WHERE as_of = ? AND member_id IS NULL AND source IS ?`).run(report.asOf, report.source);
     db.prepare(`INSERT INTO pension_reports (as_of, member_id, source, file_path, summary) VALUES (?, ?, ?, ?, ?)
       ON CONFLICT (as_of, member_id, source) DO UPDATE SET file_path = excluded.file_path, summary = excluded.summary, imported_at = CURRENT_TIMESTAMP`)
       .run(report.asOf, memberId, report.source, report.file ? `reports/${report.file}` : null,

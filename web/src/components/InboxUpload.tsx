@@ -64,7 +64,7 @@ export function InboxUpload() {
           <button type="button" className="btn btn-sm" onClick={() => input.current?.click()} disabled={busy}>
             {busy ? <><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> מייבא…</> : 'בחירת קבצים'}
           </button>
-          <input ref={input} type="file" multiple hidden accept=".xlsx,.csv"
+          <input ref={input} type="file" multiple hidden accept=".xlsx,.csv,.zip,.xml"
             onChange={e => { if (e.target.files?.length) upload([...e.target.files]); e.target.value = ''; }} />
           <span className="text-xs">קובצי Excel או CSV. הקובץ נקרא כאן במחשב, בלי לשלוח אותו לשום מקום.</span>
         </div>

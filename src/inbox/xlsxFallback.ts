@@ -12,11 +12,11 @@ import JSZip from 'jszip';
 import type { Cell, Sheet } from './readTable.js';
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
-const unescape = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) =>
+export const unescape = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) =>
   e[0] === '#' ? String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : ENTITIES[e] ?? m);
 
 /** Elements by local name, any (or no) namespace prefix: [attributes, inner XML (undefined when self-closing)]. */
-function elements(xml: string, local: string): { attrs: Record<string, string>; inner: string | undefined }[] {
+export function elements(xml: string, local: string): { attrs: Record<string, string>; inner: string | undefined }[] {
   const re = new RegExp(`<(?:[\\w.-]+:)?${local}(?=[\\s/>])([^>]*?)(?:/>|>([\\s\\S]*?)</(?:[\\w.-]+:)?${local}>)`, 'g');
   const out: { attrs: Record<string, string>; inner: string | undefined }[] = [];
   for (const m of xml.matchAll(re)) {
@@ -30,7 +30,7 @@ function elements(xml: string, local: string): { attrs: Record<string, string>; 
   return out;
 }
 /** All <t> text inside (rich text runs included), phonetic runs (<rPh>) left out. */
-const textOf = (xml: string | undefined) =>
+export const textOf = (xml: string | undefined) =>
   xml == null ? '' : elements(xml.replace(/<(?:[\w.-]+:)?rPh\b[\s\S]*?<\/(?:[\w.-]+:)?rPh>/g, ''), 't').map(t => unescape(t.inner ?? '')).join('');
 
 function resolvePath(base: string, target: string): string {
