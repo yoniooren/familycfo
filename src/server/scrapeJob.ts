@@ -48,8 +48,9 @@ export function startScrape(db: DB): ScrapeJobState {
   let config: ReturnType<typeof loadConfig>;
   try {
     config = loadConfig();
-  } catch {
-    throw Object.assign(new Error('the scraper configuration is missing or invalid (see accounts.example.json)'), { statusCode: 400 });
+  } catch (err) {
+    // the message says what's wrong (which entry, which field) and never contains a credential
+    throw Object.assign(new Error(err instanceof Error ? err.message : 'the scraper configuration is missing or invalid (see accounts.example.json)'), { statusCode: 400 });
   }
   const only = process.env.SCRAPE_ONLY?.split(',').map(s => s.trim()).filter(Boolean);
   state = {
